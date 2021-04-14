@@ -198,7 +198,7 @@
         enableClose: function () {
             this._closeButton = L.DomUtil.create("span", "close", this._container);
             this._closeButton.innerHTML =
-                '<svg class="icon" viewBox="0 0 40 40"><path style="stroke:#FF0000;stroke-width:3" d="M 10,10 L 30,30 M 30,10 L 10,30" /></svg>';
+                '<svg class="icon" viewBox="0 0 40 40"><path stroke="#FF0000" stroke-width="3" d="M 10,10 L 30,30 M 30,10 L 10,30" /></svg>';
             return this._closeButton;
         },
     });
