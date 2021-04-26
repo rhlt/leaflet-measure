@@ -89,6 +89,7 @@
         },
         _enableMeasureLine: function (ev) {
             L.DomEvent.stopPropagation(ev);
+            L.DomEvent.preventDefault(ev);
             this._measureHandler = new L.MeasureAction(this._map, {
                 model: "distance",
                 color: this.options.color,
@@ -97,6 +98,7 @@
         },
         _enableMeasureArea: function (ev) {
             L.DomEvent.stopPropagation(ev);
+            L.DomEvent.preventDefault(ev);
             this._measureHandler = new L.MeasureAction(this._map, {
                 model: "area",
                 color: this.options.color,
