@@ -267,11 +267,13 @@
             }
         },
         _enableMeasure: function () {
-            this._trail = {
-                overlays: [],
-                points: [],
-            };
             var map = this._map;
+            this._trail = {
+                points: [],
+                overlays: L.featureGroup(),
+            };
+            map.addLayer( this._trail.overlays );
+
             L.DomUtil.addClass(map._container, "leaflet-measure-map");
             map.contextMenu && map.contextMenu.disable();
             this._measurementStarted = true;
@@ -337,8 +339,7 @@
                         interactive: false,
                     });
                 }
-                this._map.addLayer(this._directPath);
-                this._trail.overlays.push(this._directPath);
+                this._trail.overlays.addLayer(this._directPath);
             } else {
                 this._directPath.addLatLng(latlng);
             }
@@ -360,8 +361,7 @@
                         interactive: false,
                     });
                 }
-                this._map.addLayer(this._measurePath);
-                this._trail.overlays.push(this._measurePath);
+                this._trail.overlays.addLayer(this._measurePath);
             } else {
                 this._measurePath.addLatLng(latlng);
             }
@@ -378,8 +378,7 @@
                 radius: 3,
                 interactive: false,
             });
-            this._map.addLayer(marker);
-            this._trail.overlays.push(marker);
+            this._trail.overlays.addLayer(marker);
         },
         _addLable: function (latlng, content, className, ended) {
             var lable = new L.MeasureLable({
@@ -387,20 +386,15 @@
                 content: content,
                 className: className,
             });
-            this._map.addLayer(lable);
-            this._trail.overlays.push(lable);
+            this._trail.overlays.addLayer(lable);
             if (ended) {
                 var closeButton = lable.enableClose();
                 L.DomEvent.on(closeButton, "click", this._clearOverlay, this);
             }
         },
         _clearOverlay: function () {
-            var i = 0,
-                overlays = this._trail.overlays,
-                length;
-            for (length = overlays.length; i < length; i++) {
-                this._map.removeLayer(overlays[i]);
-            }
+            this._map.removeLayer(this._trail.overlays);
+            this._trail.overlays = null;
         },
         toRadians: function (deg) {
             return deg * (Math.PI / 180);
