@@ -271,7 +271,14 @@
             this._trail = {
                 points: [],
                 overlays: L.featureGroup(),
+                canvas: map.options.preferCanvas || false,
             };
+            if ( map.options.preferCanvas ) {
+                map.options.preferCanvas = false;
+                console.warn( 'Temporarily reset map.options.prefersCanvas to false' );
+                //HACK: With canvas rendering enabled (and no other markers present on the map), this will create an permanent
+                // overlaying layer of type L.Canvas that swallows mouse events.
+            }
             map.addLayer( this._trail.overlays );
 
             L.DomUtil.addClass(map._container, "leaflet-measure-map");
@@ -395,6 +402,7 @@
         _clearOverlay: function () {
             this._map.removeLayer(this._trail.overlays);
             this._trail.overlays = null;
+            this._map.options.preferCanvas = this._trail.canvas;
         },
         toRadians: function (deg) {
             return deg * (Math.PI / 180);
