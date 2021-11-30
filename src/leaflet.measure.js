@@ -428,8 +428,8 @@
             return 2 * earthRadius * Math.asin(Math.sqrt(a));
         },
         _getAreaString: function (points) {
-            var a = Math.round(this._getArea(points));
-            return a < 1e6
+            var a = this._getArea(points);
+            return Math.round(a) < 1e6
                 ? this._numberFormat(a, L.Measure.squareMeterDecimals) + " " + L.Measure.squareMeter
                 : this._numberFormat(a / 1e6, L.Measure.squareKilometersDecimals) + " " + L.Measure.squareKilometers;
         },
