@@ -18,9 +18,13 @@
         areaMeasurement: "Area measurement",
         start: "Start",
         meter: "m",
+        meterDecimals: 0,
         kilometer: "km",
+        kilometerDecimals: 2,
         squareMeter: "m²",
+        squareMeterDecimals: 0,
         squareKilometers: "km²",
+        squareKilometersDecimals: 2
     };
 
     L.Control.Measure = L.Control.extend({
@@ -408,8 +412,8 @@
         },
         _getDistanceString: function (distance) {
             return distance < 1e3
-                ? this._numberFormat(distance, 0) + " " + L.Measure.meter
-                : this._numberFormat(distance / 1e3, 2) + " " + L.Measure.kilometer;
+                ? this._numberFormat(distance, L.Measure.meterDecimals) + " " + L.Measure.meter
+                : this._numberFormat(distance / 1e3, L.Measure.kilometerDecimals) + " " + L.Measure.kilometer;
         },
 
         _getDistance: function (latlng1, latlng2) {
@@ -424,10 +428,10 @@
             return 2 * earthRadius * Math.asin(Math.sqrt(a));
         },
         _getAreaString: function (points) {
-            var a = Math.round(this._getArea(points));
-            return a < 1e6
-                ? this._numberFormat(a, 0) + " " + L.Measure.squareMeter
-                : this._numberFormat(a / 1e6, 2) + " " + L.Measure.squareKilometers;
+            var a = this._getArea(points);
+            return Math.round(a) < 1e6
+                ? this._numberFormat(a, L.Measure.squareMeterDecimals) + " " + L.Measure.squareMeter
+                : this._numberFormat(a / 1e6, L.Measure.squareKilometersDecimals) + " " + L.Measure.squareKilometers;
         },
         _getArea: function (points) {
             var earthRadius = 6378137;

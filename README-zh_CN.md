@@ -48,8 +48,12 @@ L.Measure = {
     areaMeasurement: "面积测量",
     start: "开始",
     meter: "米",
+    meterDecimals: 0,
     kilometer: "公里",
+    kilometerDecimals: 2,
     squareMeter: "平方米",
+    squareMeterDecimals: 0,
     squareKilometers: "平方公里",
+    squareKilometersDecimals: 2
 };
 ```
