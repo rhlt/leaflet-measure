@@ -25,8 +25,9 @@ measureAction.enable();
 |--------|------|---------|-------------|
 | position | String | 'topleft' | The position of the control. |
 | title | String | 'Measurement' | The title of the control. |
-| collapsed | Boolean | false | If true, the control will be collapsed into an icon and expanded on mouse hover or touch. |
+| collapsed | Boolean | false | If true, the control will be collapsed into an icon and expanded on mouse hover or touch. Only relevant if model is set to 'user'. |
 | color | String | '#FF0080'| The color of the lines or polygons. |
+| model | String | 'user' | Set to 'distance' or 'area' to allow only one measurement mode. If it is set to 'user' (default) the user has a choice between 'Distance measurement' or 'Area measurement'. |
 
 ## L.MeasureAction 
 ### Options

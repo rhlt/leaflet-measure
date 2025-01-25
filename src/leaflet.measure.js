@@ -13,7 +13,7 @@
         factory(L);
     }
 })(function (L) {
-    L.Measure = {
+    const _defaultSettings = {
         linearMeasurement: "Distance measurement",
         areaMeasurement: "Area measurement",
         start: "Start",
@@ -27,12 +27,22 @@
         squareKilometersDecimals: 2,
     };
 
+    var _getSetting = function (key) {
+        // Get a (global) setting from L.Measure
+        if (L.Measure !== _defaultSettings) {
+            // Ensure all settings are there if L.Measure was overwritten
+            L.Measure = L.extend(_defaultSettings, L.Measure);
+        }
+        return L.Measure[key];
+    };
+
     L.Control.Measure = L.Control.extend({
         options: {
             position: "topright",
             title: "Measurement",
             collapsed: true,
             color: "#FF0080",
+            model: "user", // Let user pick the measurement type (alternatively: "distance" or "area")
         },
         initialize: function (options) {
             L.Util.setOptions(this, options);
@@ -62,14 +72,14 @@
             var ele_ul = L.DomUtil.create("ul", "leaflet-measure-actions", this._contents);
             var ele_li = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
             var ele_link_line = L.DomUtil.create("a", "start", ele_li);
-            ele_link_line.innerText = L.Measure.linearMeasurement;
+            ele_link_line.innerText = _getSetting('linearMeasurement');
             ele_link_line.href = "#";
             L.DomEvent.disableClickPropagation(ele_link_line);
             L.DomEvent.on(ele_link_line, "click", this._enableMeasureLine, this);
 
             ele_li = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
             var ele_link_area = L.DomUtil.create("a", "leaflet-measure-action start", ele_li);
-            ele_link_area.innerText = L.Measure.areaMeasurement;
+            ele_link_area.innerText = _getSetting('areaMeasurement');
             ele_link_area.href = "#";
             L.DomEvent.disableClickPropagation(ele_link_area);
             L.DomEvent.on(ele_link_area, "click", this._enableMeasureArea, this);
@@ -78,17 +88,30 @@
             this._buildContainer();
             L.DomEvent.disableClickPropagation(this._container);
             L.DomEvent.disableScrollPropagation(this._container);
-            if (this.options.collapsed) {
-                L.DomEvent.on(
-                    this._container,
-                    {
-                        mouseenter: this._expand,
-                        mouseleave: this._collapse,
-                    },
-                    this
-                );
-            } else {
-                this._expand();
+            switch (this.options.model) {
+                case "user":
+                    if (this.options.collapsed) {
+                        L.DomEvent.on(
+                            this._container,
+                            {
+                                mouseenter: this._expand,
+                                mouseleave: this._collapse,
+                            },
+                            this
+                        );
+                    } else {
+                        this._expand();
+                    }
+                    break;
+                case "distance":
+                    L.DomEvent.on(this._container, { click: this._enableMeasureLine }, this);
+                    break;
+                case "area":
+                    L.DomEvent.on(this._container, { click: this._enableMeasureArea }, this);
+                    break;
+                default:
+                    L.DomEvent.on(this._container, { click: L.Util.FalseFn }, this); // Do nothing
+                    console.warn('[LEAFLET.MEASURE] Invalid value for "model" option: ', this.options.model)
             }
         },
         _enableMeasureLine: function (ev) {
@@ -220,20 +243,30 @@
 
         initialize: function (map, options) {
             this._map = map;
-            this._map._measureHandler = this;
             L.Util.setOptions(this, options);
+            if (this._map._measureHandler) {
+                this.disable();
+                return;
+            }
+            this._map._measureHandler = this;
         },
         setModel: function (model) {
             this.options.model = model;
             return this;
         },
         addHooks: function () {
-            this._activeMeasure();
+            if (this._map._measureHandler !== this) {
+                return;
+            }
+            this._enableMeasure();
         },
-        removeHooks: function () {},
-        _activeMeasure: function () {
-            this._map._measureHandler._measurementStarted && this._map._measureHandler._finishMeasure();
-            this._measurementStarted ? this._finishMeasure() : this._enableMeasure();
+        removeHooks: function () {
+            if (this._map._measureHandler === this) {
+                if (this._measurementStarted) {
+                    this._finishMeasure();
+                }
+                this._map._measureHandler = null;
+            }
         },
         _onMouseClick: function (event) {
             var latlng = event.latlng || this._map.mouseEventToLatLng(event);
@@ -255,7 +288,7 @@
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
                 if (this.options.model !== "area") {
-                    this._addLabel(latlng, L.Measure.start, "leaflet-measure-label");
+                    this._addLabel(latlng, _getSetting('start'), "leaflet-measure-label");
                 }
                 this._trail.points.push(latlng);
             }
@@ -282,7 +315,7 @@
             };
             if ( map.options.preferCanvas ) {
                 map.options.preferCanvas = false;
-                console.warn( 'Temporarily reset map.options.prefersCanvas to false' );
+                console.warn('[LEAFLET.MEASURE] Temporarily reset map.options.prefersCanvas to false');
                 //HACK: With canvas rendering enabled (and no other markers present on the map), this will create an permanent
                 // overlaying layer of type L.Canvas that swallows mouse events.
             }
@@ -419,8 +452,8 @@
         },
         _getDistanceString: function (distance) {
             return distance < 1e3
-                ? this._numberFormat(distance, L.Measure.meterDecimals) + " " + L.Measure.meter
-                : this._numberFormat(distance / 1e3, L.Measure.kilometerDecimals) + " " + L.Measure.kilometer;
+                ? this._numberFormat(distance, _getSetting('meterDecimals')) + " " + _getSetting('meter')
+                : this._numberFormat(distance / 1e3, _getSetting('kilometerDecimals')) + " " + _getSetting('kilometer');
         },
 
         _getDistance: function (latlng1, latlng2) {
@@ -437,8 +470,8 @@
         _getAreaString: function (points) {
             var a = this._getArea(points);
             return Math.round(a) < 1e6
-                ? this._numberFormat(a, L.Measure.squareMeterDecimals) + " " + L.Measure.squareMeter
-                : this._numberFormat(a / 1e6, L.Measure.squareKilometersDecimals) + " " + L.Measure.squareKilometers;
+                ? this._numberFormat(a, _getSetting('squareMeterDecimals')) + " " + _getSetting('squareMeter')
+                : this._numberFormat(a / 1e6, _getSetting('squareKilometersDecimals')) + " " + _getSetting('squareKilometers');
         },
         _getArea: function (points) {
             var earthRadius = 6378137;
