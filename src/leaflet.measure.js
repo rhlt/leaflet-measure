@@ -21,10 +21,10 @@
         meterDecimals: 0,
         kilometer: "km",
         kilometerDecimals: 2,
-        squareMeter: "m²",
+        squareMeter: "m\u00B2",
         squareMeterDecimals: 0,
-        squareKilometers: "km²",
-        squareKilometersDecimals: 2
+        squareKilometers: "km\u00B2",
+        squareKilometersDecimals: 2,
     };
 
     L.Control.Measure = L.Control.extend({
@@ -125,7 +125,7 @@
         return new L.Control.Measure(options);
     };
 
-    L.MeasureLable = L.Layer.extend({
+    L.MeasureLabel = L.Layer.extend({
         options: {
             offset: new L.Point(0, 30),
             latlng: null,
@@ -209,6 +209,9 @@
         },
     });
 
+    // Support use of misspelling for backwards compatibility
+    L.MeasureLable = L.MeasureLabel;
+
     L.MeasureAction = L.Handler.extend({
         options: {
             color: "#FF0080",
@@ -245,14 +248,14 @@
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
                 if (this.options.model !== "area") {
-                    this._addLable(latlng, this._getDistanceString(this._totalDistance), "leaflet-measure-lable");
+                    this._addLabel(latlng, this._getDistanceString(this._totalDistance), "leaflet-measure-label");
                 }
             } else {
                 this._totalDistance = 0;
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
                 if (this.options.model !== "area") {
-                    this._addLable(latlng, L.Measure.start, "leaflet-measure-lable");
+                    this._addLabel(latlng, L.Measure.start, "leaflet-measure-label");
                 }
                 this._trail.points.push(latlng);
             }
@@ -311,17 +314,17 @@
                         this._directPath.setLatLngs(this._trail.points);
                     }
                     if (this.options.model === "area") {
-                        this._addLable(
+                        this._addLabel(
                             this._lastPoint,
                             this._getAreaString(this._trail.points),
-                            "leaflet-measure-lable",
+                            "leaflet-measure-label",
                             true
                         );
                     } else {
-                        this._addLable(
+                        this._addLabel(
                             this._lastPoint,
                             this._getDistanceString(this._totalDistance),
-                            "leaflet-measure-lable",
+                            "leaflet-measure-label",
                             true
                         );
                     }
@@ -391,15 +394,15 @@
             });
             this._trail.overlays.addLayer(marker);
         },
-        _addLable: function (latlng, content, className, ended) {
-            var lable = new L.MeasureLable({
+        _addLabel: function (latlng, content, className, ended) {
+            var label = new L.MeasureLabel({
                 latlng: latlng,
                 content: content,
                 className: className,
             });
-            this._trail.overlays.addLayer(lable);
+            this._trail.overlays.addLayer(label);
             if (ended) {
-                var closeButton = lable.enableClose();
+                var closeButton = label.enableClose();
                 L.DomEvent.on(closeButton, "click", this._clearOverlay, this);
             }
         },
