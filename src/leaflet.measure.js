@@ -545,10 +545,10 @@
         },
         _getArea: function (points) {
             const earthRadius = 6378137;
-            const area = 0;
             const len = points.length;
-            const x1 = points[len - 1].lng;
-            const y1 = points[len - 1].lat;
+            let area = 0;
+            let x1 = points[len - 1].lng;
+            let y1 = points[len - 1].lat;
             for (let i = 0; i < len; i++) {
                 const x2 = points[i].lng;
                 const y2 = points[i].lat;
