@@ -27,7 +27,7 @@
         squareKilometersDecimals: 2,
     };
 
-    var _getSetting = function (key) {
+    const _getSetting = function (key) {
         // Get a (global) setting from L.Measure
         if (L.Measure !== _defaultSettings) {
             // Ensure all settings are there if L.Measure was overwritten
@@ -62,23 +62,23 @@
             this._link.href = "#";
 
             if (this.options.title) {
-                var title = L.DomUtil.create("h3", "", this._contents);
+                const title = L.DomUtil.create("h3", "", this._contents);
                 title.innerText = this.options.title;
             }
 
             this._buildItems();
         },
         _buildItems: function () {
-            var ele_ul = L.DomUtil.create("ul", "leaflet-measure-actions", this._contents);
-            var ele_li = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
-            var ele_link_line = L.DomUtil.create("a", "start", ele_li);
+            const ele_ul = L.DomUtil.create("ul", "leaflet-measure-actions", this._contents);
+            const ele_li = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
+            const ele_link_line = L.DomUtil.create("a", "start", ele_li);
             ele_link_line.innerText = _getSetting('linearMeasurement');
             ele_link_line.href = "#";
             L.DomEvent.disableClickPropagation(ele_link_line);
             L.DomEvent.on(ele_link_line, "click", this._enableMeasureLine, this);
 
-            ele_li = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
-            var ele_link_area = L.DomUtil.create("a", "leaflet-measure-action start", ele_li);
+            const ele_li2 = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
+            const ele_link_area = L.DomUtil.create("a", "leaflet-measure-action start", ele_li2);
             ele_link_area.innerText = _getSetting('areaMeasurement');
             ele_link_area.href = "#";
             L.DomEvent.disableClickPropagation(ele_link_area);
@@ -211,7 +211,7 @@
             }
         },
         _updatePosition: function () {
-            var point = this._map.latLngToLayerPoint(this.options.latlng),
+            const point = this._map.latLngToLayerPoint(this.options.latlng),
                 is3D = L.Browser.any3d,
                 offset = this.options.offset;
             is3D && L.DomUtil.setPosition(this._container, point);
@@ -245,6 +245,10 @@
             this._map = map;
             L.Util.setOptions(this, options);
             if (this._map._measureHandler) {
+                if (this.options.model != this._map._measureHandler.options.model) {
+                    // Switch current measurement model between 'area' and 'distance'
+                    this._map._measureHandler.setModel(this.options.model);
+                }
                 this.disable();
                 return;
             }
@@ -252,6 +256,8 @@
         },
         setModel: function (model) {
             this.options.model = model;
+            this._redrawPath();
+            this._redrawLabels();
             return this;
         },
         addHooks: function () {
@@ -269,15 +275,18 @@
             }
         },
         _onMouseClick: function (event) {
-            var latlng = event.latlng || this._map.mouseEventToLatLng(event);
+            const latlng = event.latlng || this._map.mouseEventToLatLng(event);
             if (this._lastPoint && latlng.equals(this._lastPoint)) {
                 return;
             }
             if (this._trail.points.length > 0) {
-                var points = this._trail.points;
+                const points = this._trail.points;
+                const distances = this._trail.distances;
                 points.push(latlng);
-                var length = points.length;
-                this._totalDistance += this._getDistance(points[length - 2], points[length - 1]);
+                const length = points.length;
+                const newDistance = this._getDistance(points[length - 2], points[length - 1]);
+                distances.push(newDistance);
+                this._totalDistance += newDistance;
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
                 if (this.options.model !== "area") {
@@ -285,6 +294,7 @@
                 }
             } else {
                 this._totalDistance = 0;
+                this._trail.distances = [0];
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
                 if (this.options.model !== "area") {
@@ -296,7 +306,7 @@
             this._startMove = false;
         },
         _onMouseMove: function (event) {
-            var latlng = event.latlng;
+            const latlng = event.latlng;
             if (this._trail.points.length > 0) {
                 if (this._startMove) {
                     this._directPath.setLatLngs(this._trail.points.concat(latlng));
@@ -307,19 +317,22 @@
             }
         },
         _enableMeasure: function () {
-            var map = this._map;
+            const map = this._map;
             this._trail = {
                 points: [],
+                distances: [],
+                labels: [],
+                markers: [],
                 overlays: L.featureGroup(),
                 canvas: map.options.preferCanvas || false,
             };
-            if ( map.options.preferCanvas ) {
+            if (map.options.preferCanvas) {
                 map.options.preferCanvas = false;
                 console.warn('[LEAFLET.MEASURE] Temporarily reset map.options.prefersCanvas to false');
-                //HACK: With canvas rendering enabled (and no other markers present on the map), this will create an permanent
+                // HACK: With canvas rendering enabled (and no other markers present on the map), this will create an permanent
                 // overlaying layer of type L.Canvas that swallows mouse events.
             }
-            map.addLayer( this._trail.overlays );
+            map.addLayer(this._trail.overlays);
 
             L.DomUtil.addClass(map._container, "leaflet-measure-map");
             map.contextMenu && map.contextMenu.disable();
@@ -330,7 +343,7 @@
             map.on("mousemove", this._onMouseMove, this);
         },
         _disableMeasure: function () {
-            var map = this._map;
+            const map = this._map;
             L.DomUtil.removeClass(map.getContainer(), "leaflet-measure-map");
             map.contextMenu && map.contextMenu.enable();
             map.off("click", this._onMouseClick, this);
@@ -415,7 +428,7 @@
             this._resetDirectPath(latlng);
         },
         _addMarker: function (latLng) {
-            var marker = new L.CircleMarker(latLng, {
+            const marker = new L.CircleMarker(latLng, {
                 color: this.options.color,
                 opacity: 1,
                 weight: 1,
@@ -425,19 +438,76 @@
                 radius: 3,
                 interactive: false,
             });
+            this._trail.markers.push(marker);
             this._trail.overlays.addLayer(marker);
         },
         _addLabel: function (latlng, content, className, ended) {
-            var label = new L.MeasureLabel({
+            const label = new L.MeasureLabel({
                 latlng: latlng,
                 content: content,
                 className: className,
             });
+            this._trail.labels.push(label);
             this._trail.overlays.addLayer(label);
             if (ended) {
-                var closeButton = label.enableClose();
+                const closeButton = label.enableClose();
                 L.DomEvent.on(closeButton, "click", this._clearOverlay, this);
             }
+        },
+        _removeLabels: function () {
+            this._trail.labels.forEach(label => label.remove());
+            this._trail.labels = [];
+        },
+        _redrawLabels: function () {
+            this._removeLabels();
+            if (!this._trail || this._trail.points.length <= 1) {
+                return;
+            }
+            if (this.options.model === "area") {
+                if (!this._measurementStarted) {
+                    this._addLabel(
+                        this._lastPoint,
+                        this._getAreaString(this._trail.points),
+                        "leaflet-measure-label",
+                        true
+                    );
+                }
+            } else {
+                let currentDistance = 0;
+                this._trail.points.forEach((latlng, i) => {
+                    const distance = this._trail.distances[i];
+                    currentDistance += distance;
+                    if (i == 0) {
+                        this._addLabel(latlng, _getSetting("start"), "leaflet-measure-label");
+                    } else {
+                        this._addLabel(
+                            latlng,
+                            this._getDistanceString(currentDistance),
+                            "leaflet-measure-label",
+                            i == this._trail.points.length - 1 && !this._measurementStarted
+                        );
+                    }
+                });
+            }
+        },
+        _removePath: function () {
+            if (this._measurePath) {
+                this._measurePath.remove();
+            }
+            if (this._directPath) {
+                this._directPath.remove();
+            }
+            this._trail.markers.forEach(marker => marker.remove());
+            this._measurePath = null;
+            this._directPath = null;
+            this._trail.markers = [];
+        },
+        _redrawPath: function () {
+            this._removePath();
+            this._trail.points.forEach(latlng => {
+                this._addMeasurePoint(latlng);
+                this._addMarker(latlng);
+            });
         },
         _clearOverlay: function () {
             this._map.removeLayer(this._trail.overlays);
@@ -457,31 +527,31 @@
         },
 
         _getDistance: function (latlng1, latlng2) {
-            var earthRadius = 6378137; // radius of the earth in meter
-            var lat1 = this.toRadians(latlng1.lat);
-            var lat2 = this.toRadians(latlng2.lat);
-            var lat_dif = lat2 - lat1;
-            var lng_dif = this.toRadians(latlng2.lng - latlng1.lng);
-            var a =
+            const earthRadius = 6378137; // radius of the earth in meters
+            const lat1 = this.toRadians(latlng1.lat);
+            const lat2 = this.toRadians(latlng2.lat);
+            const lat_dif = lat2 - lat1;
+            const lng_dif = this.toRadians(latlng2.lng - latlng1.lng);
+            const a =
                 this.square(Math.sin(lat_dif / 2)) +
                 Math.cos(lat1) * Math.cos(lat2) * this.square(Math.sin(lng_dif / 2));
             return 2 * earthRadius * Math.asin(Math.sqrt(a));
         },
         _getAreaString: function (points) {
-            var a = this._getArea(points);
+            const a = this._getArea(points);
             return Math.round(a) < 1e6
                 ? this._numberFormat(a, _getSetting('squareMeterDecimals')) + " " + _getSetting('squareMeter')
                 : this._numberFormat(a / 1e6, _getSetting('squareKilometersDecimals')) + " " + _getSetting('squareKilometers');
         },
         _getArea: function (points) {
-            var earthRadius = 6378137;
-            var area = 0;
-            var len = points.length;
-            var x1 = points[len - 1].lng;
-            var y1 = points[len - 1].lat;
-            for (var i = 0; i < len; i++) {
-                var x2 = points[i].lng;
-                var y2 = points[i].lat;
+            const earthRadius = 6378137;
+            const area = 0;
+            const len = points.length;
+            const x1 = points[len - 1].lng;
+            const y1 = points[len - 1].lat;
+            for (let i = 0; i < len; i++) {
+                const x2 = points[i].lng;
+                const y2 = points[i].lat;
                 area += this.toRadians(x2 - x1) * (2 + Math.sin(this.toRadians(y1)) + Math.sin(this.toRadians(y2)));
                 x1 = x2;
                 y1 = y2;
@@ -489,11 +559,11 @@
             return Math.abs((area * earthRadius * earthRadius) / 2.0);
         },
         _numberFormat: function (number, decimals = 2) {
-            var thousandsSep = ",";
-            var sign = number < 0 ? "-" : "";
-            var num = Math.abs(+number || 0);
-            var intPart = parseInt(num.toFixed(decimals), 10) + "";
-            var j = intPart.length > 3 ? intPart.length % 3 : 0;
+            const thousandsSep = ",";
+            const sign = number < 0 ? "-" : "";
+            const num = Math.abs(+number || 0);
+            const intPart = parseInt(num.toFixed(decimals), 10) + "";
+            const j = intPart.length > 3 ? intPart.length % 3 : 0;
 
             return [
                 sign,
