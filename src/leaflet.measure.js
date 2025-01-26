@@ -283,7 +283,7 @@
                     // Switch current measurement model between 'area' and 'distance'
                     this._map._measureHandler.setModel(this.options.model);
                 }
-                // Avoid starting a second measure action
+                // Avoid starting a second measure action on the same map
                 this.disable();
                 return;
             }
@@ -293,6 +293,7 @@
             this.options.model = model;
             this.redrawPath();
             this.redrawLabels();
+            this._map.fire("measureAction:modelChange", this);
             return this;
         },
         addHooks: function () {
@@ -339,6 +340,7 @@
             }
             this._lastPoint = latlng;
             this._startMove = false;
+            this._map.fire("measureAction:addPoint", this);
         },
         _onMouseMove: function (event) {
             const latlng = event.latlng;
@@ -376,6 +378,7 @@
             map.on("dblclick contextmenu", this._finishMeasure, this);
             map.doubleClickZoom.disable();
             map.on("mousemove", this._onMouseMove, this);
+            map.fire("measureAction:start", this);
         },
         _disableMeasure: function () {
             const map = this._map;
@@ -387,6 +390,7 @@
             map.doubleClickZoom.enable();
             this._measurementStarted = this._startMove = false;
             this.disable();
+            map.fire("measureAction:end", this);
         },
         _finishMeasure: function (event) {
             if (this._trail.points.length > 0) {
@@ -567,6 +571,7 @@
             this._map.removeLayer(this._trail.overlays);
             this._trail.overlays = null;
             this._map.options.preferCanvas = this._trail.canvas;
+            this._map.fire("measureAction:clear", this);
         },
         toRadians: function (deg) {
             return deg * (Math.PI / 180);
