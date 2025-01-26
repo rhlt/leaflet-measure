@@ -505,13 +505,18 @@
             this._trail.markers.push(marker);
             this._trail.overlays.addLayer(marker);
         },
+        _closeButtonClick: function (ev) {
+            L.DomEvent.stopPropagation(ev);
+            L.DomEvent.preventDefault(ev);
+            this._clearOverlay();
+        },
         _addLabel: function (latlng, content, className, ended) {
             const label = new L.MeasureLabel({ latlng, content, className });
             this._trail.labels.push(label);
             this._trail.overlays.addLayer(label);
             if (ended) {
                 const closeButton = label.enableClose();
-                L.DomEvent.on(closeButton, "click", this._clearOverlay, this);
+                L.DomEvent.on(closeButton, "click", this._closeButtonClick, this);
             }
             return label;
         },
