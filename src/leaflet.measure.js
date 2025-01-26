@@ -13,38 +13,75 @@
         factory(L);
     }
 })(function (L) {
-    const _defaultSettings = {
-        linearMeasurement: "Distance measurement",
-        areaMeasurement: "Area measurement",
-        start: "Start",
+    const _defaultOptions = {
+        // Control options
+        position: "topright", // Control position
+        collapsed: true, // Control is collapsed until mouse over (only relevant if model is set to "user")
+        title: "Measurement", // Control title
+        distanceMeasurement: "Distance measurement", // Control label that sets the model to "distance"
+        areaMeasurement: "Area measurement", // Control label that sets the model to "distance"
+        // Measurement path options
+        color: "#FF0080", // Line color
+        pointColor: "#FFFFFF", // Color of measuring point
+        model: "user", // Let user pick the measurement type (alternatively: "distance" or "area")
+        start: "Start", // Label for the first point
+        // Units and their values
+        distanceUnits: { meter: 1, kilometer: 1000 }, // Units for distance, with the number of number of meters
+        areaUnits: { squareMeter: 1, hectare: 1e4, squareKilometer: 1e6 }, // Units for area, with the number of square meters for each
+        // distanceUnits: { foot: 0.3048, mile: 1609.344 },
+        // areaUnits: { squareFoot: 0.09290304, acre: 4046.8564224, squareMile: 2589988.110336 },
         meter: "m",
         meterDecimals: 0,
         kilometer: "km",
         kilometerDecimals: 2,
         squareMeter: "m\u00B2",
         squareMeterDecimals: 0,
-        squareKilometers: "km\u00B2",
-        squareKilometersDecimals: 2,
+        hectare: "ha",
+        hectareDecimals: 2,
+        squareKilometer: "km\u00B2",
+        squareKilometerDecimals: 2,
+        foot: "ft",
+        footDecimals: 0,
+        mile: "mi",
+        mileDecimals: 2,
+        squareFoot: "sq ft",
+        squareFootDecimals: 0,
+        acre: "acres",
+        acreDecimals: 2,
+        squareMile: "sq mi",
+        squareMileDecimals: 2,
+        thousandsSeparator: ",",
+        decimalPoint: ".",
+        minusSign: "-",
+        unitSpace: " ",
     };
 
-    const _getSetting = function (key) {
-        // Get a (global) setting from L.Measure
-        if (L.Measure !== _defaultSettings) {
-            // Ensure all settings are there if L.Measure was overwritten
-            L.Measure = L.extend(_defaultSettings, L.Measure);
+    const _getOptions = function () {
+        // Get all (global) setting from L.Measure
+        if (L.Measure !== _defaultOptions) {
+            // Ensure all options are there if L.Measure was overwritten
+            L.Measure = L.extend(_defaultOptions, L.Measure);
         }
-        return L.Measure[key];
+        const renamedOptions = {
+            // Some options were changed for consistency; make sure to support the "old" names
+            linearMeasurement: 'distanceMeasurement',
+            squareKilometers: 'squareKilometer',
+            squareKilometersDecimals: 'squareKilometerDecimals',
+        };
+        for (let key in renamedOptions) {
+            // If any of the old names were used, apply them to the renamed setting
+            if (key in L.Measure) {
+                L.Measure[renamedOptions[key]] = L.Measure[L.Measure];
+                delete L.Measure[key];
+            }
+        }
+        return L.Measure;
     };
 
     L.Control.Measure = L.Control.extend({
-        options: {
-            position: "topright",
-            title: "Measurement",
-            collapsed: true,
-            color: "#FF0080",
-            model: "user", // Let user pick the measurement type (alternatively: "distance" or "area")
-        },
+        options: L.extend({}, _getOptions()),
         initialize: function (options) {
+            L.Util.setOptions(this, L.Measure);
             L.Util.setOptions(this, options);
         },
         onAdd: function (map) {
@@ -54,11 +91,9 @@
         },
         _buildContainer: function () {
             this._container = L.DomUtil.create("div", "leaflet-control-measure leaflet-bar leaflet-control");
-
             this._contents = L.DomUtil.create("div", "leaflet-measure-contents", this._container);
-
             this._link = L.DomUtil.create("a", "leaflet-measure-toggle", this._container);
-            this._link.title = this.options.title || "Measurement";
+            this._link.title = this.options.title;
             this._link.href = "#";
 
             if (this.options.title) {
@@ -71,18 +106,18 @@
         _buildItems: function () {
             const ele_ul = L.DomUtil.create("ul", "leaflet-measure-actions", this._contents);
             const ele_li = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
-            const ele_link_line = L.DomUtil.create("a", "start", ele_li);
-            ele_link_line.innerText = _getSetting('linearMeasurement');
-            ele_link_line.href = "#";
-            L.DomEvent.disableClickPropagation(ele_link_line);
-            L.DomEvent.on(ele_link_line, "click", this._enableMeasureLine, this);
+            const ele_link_distance = L.DomUtil.create("a", "start", ele_li);
+            ele_link_distance.innerText = this.options.distanceMeasurement;
+            ele_link_distance.href = "#";
+            L.DomEvent.disableClickPropagation(ele_link_distance);
+            L.DomEvent.on(ele_link_distance, "click", this._measureDistanceClick, this);
 
             const ele_li2 = L.DomUtil.create("li", "leaflet-measure-action", ele_ul);
             const ele_link_area = L.DomUtil.create("a", "leaflet-measure-action start", ele_li2);
-            ele_link_area.innerText = _getSetting('areaMeasurement');
+            ele_link_area.innerText = this.options.areaMeasurement;
             ele_link_area.href = "#";
             L.DomEvent.disableClickPropagation(ele_link_area);
-            L.DomEvent.on(ele_link_area, "click", this._enableMeasureArea, this);
+            L.DomEvent.on(ele_link_area, "click", this._measureAreaClick, this);
         },
         _initLayout: function () {
             this._buildContainer();
@@ -104,33 +139,29 @@
                     }
                     break;
                 case "distance":
-                    L.DomEvent.on(this._container, { click: this._enableMeasureLine }, this);
+                    L.DomEvent.on(this._container, { click: this._measureDistanceClick }, this);
                     break;
                 case "area":
-                    L.DomEvent.on(this._container, { click: this._enableMeasureArea }, this);
+                    L.DomEvent.on(this._container, { click: this._measureAreaClick }, this);
                     break;
                 default:
                     L.DomEvent.on(this._container, { click: L.Util.FalseFn }, this); // Do nothing
                     console.warn('[LEAFLET.MEASURE] Invalid value for "model" option: ', this.options.model)
             }
         },
-        _enableMeasureLine: function (ev) {
-            L.DomEvent.stopPropagation(ev);
-            L.DomEvent.preventDefault(ev);
-            this._measureHandler = new L.MeasureAction(this._map, {
-                model: "distance",
-                color: this.options.color,
-            });
+        _startMeasureAction: function (model = "distance") {
+            this._measureHandler = new L.MeasureAction(this._map, L.extend(L.extend({}, this.options), { model }));
             this._measureHandler.enable();
         },
-        _enableMeasureArea: function (ev) {
+        _measureDistanceClick: function (ev) {
             L.DomEvent.stopPropagation(ev);
             L.DomEvent.preventDefault(ev);
-            this._measureHandler = new L.MeasureAction(this._map, {
-                model: "area",
-                color: this.options.color,
-            });
-            this._measureHandler.enable();
+            this._startMeasureAction("distance");
+        },
+        _measureAreaClick: function (ev) {
+            L.DomEvent.stopPropagation(ev);
+            L.DomEvent.preventDefault(ev);
+            this._startMeasureAction("area");
         },
         _expand: function () {
             this._link.style.display = "none";
@@ -236,19 +267,17 @@
     L.MeasureLable = L.MeasureLabel;
 
     L.MeasureAction = L.Handler.extend({
-        options: {
-            color: "#FF0080",
-            model: "distance", // area or distance
-        },
-
+        options: L.extend({}, _getOptions()),
         initialize: function (map, options) {
             this._map = map;
+            L.Util.setOptions(this, L.Measure);
             L.Util.setOptions(this, options);
             if (this._map._measureHandler) {
                 if (this.options.model != this._map._measureHandler.options.model) {
                     // Switch current measurement model between 'area' and 'distance'
                     this._map._measureHandler.setModel(this.options.model);
                 }
+                // Avoid starting a second measure action
                 this.disable();
                 return;
             }
@@ -298,7 +327,7 @@
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
                 if (this.options.model !== "area") {
-                    this._addLabel(latlng, _getSetting('start'), "leaflet-measure-label");
+                    this._addLabel(latlng, this.options.start, "leaflet-measure-label");
                 }
                 this._trail.points.push(latlng);
             }
@@ -478,7 +507,7 @@
                     const distance = this._trail.distances[i];
                     currentDistance += distance;
                     if (i == 0) {
-                        this._addLabel(latlng, _getSetting("start"), "leaflet-measure-label");
+                        this._addLabel(latlng, this.options.start, "leaflet-measure-label");
                     } else {
                         this._addLabel(
                             latlng,
@@ -520,12 +549,28 @@
         square: function (x) {
             return Math.pow(x, 2);
         },
-        _getDistanceString: function (distance) {
-            return distance < 1e3
-                ? this._numberFormat(distance, _getSetting('meterDecimals')) + " " + _getSetting('meter')
-                : this._numberFormat(distance / 1e3, _getSetting('kilometerDecimals')) + " " + _getSetting('kilometer');
+        _getUnit: function (value, units) {
+            // Get the most appropriate unit for a given value from a list of units (that is, the largest unit where the value is at least 1, or the smallest unit otherwise)
+            let smallestUnit = null, bestUnit = null;
+            let smallestSize = 0, bestSize = 0;
+            for (let unit in units) {
+                if (smallestUnit === null || smallestSize > units[unit]) {
+                    // Smaller unit
+                    smallestUnit = unit;
+                    smallestSize = units[unit];
+                }
+                if (units[unit] <= value && units[unit] > bestSize) {
+                    // Better unit (bigger, but not too big)
+                    bestUnit = unit;
+                    bestSize = units[unit];
+                }
+            }
+            return bestUnit === null ? [smallestUnit, smallestSize || 1] : [bestUnit, bestSize || 1];
         },
-
+        _getDistanceString: function (distance) {
+            const [unit, unitSize] = this._getUnit(distance, this.options.distanceUnits);
+            return this._numberFormat(distance, unit, unitSize);
+        },
         _getDistance: function (latlng1, latlng2) {
             const earthRadius = 6378137; // radius of the earth in meters
             const lat1 = this.toRadians(latlng1.lat);
@@ -539,9 +584,8 @@
         },
         _getAreaString: function (points) {
             const a = this._getArea(points);
-            return Math.round(a) < 1e6
-                ? this._numberFormat(a, _getSetting('squareMeterDecimals')) + " " + _getSetting('squareMeter')
-                : this._numberFormat(a / 1e6, _getSetting('squareKilometersDecimals')) + " " + _getSetting('squareKilometers');
+            const [unit, unitSize] = this._getUnit(a, this.options.areaUnits);
+            return this._numberFormat(a, unit, unitSize);
         },
         _getArea: function (points) {
             const earthRadius = 6378137;
@@ -558,23 +602,26 @@
             }
             return Math.abs((area * earthRadius * earthRadius) / 2.0);
         },
-        _numberFormat: function (number, decimals = 2) {
-            const thousandsSep = ",";
-            const sign = number < 0 ? "-" : "";
+        _numberFormat: function (value, unit = null, unitSize = 1) {
+            const number = value / unitSize;
+            const sign = number < 0 ? this.options.minusSign : "";
             const num = Math.abs(+number || 0);
+            const unitSymbol = unit in this.options ? this.options[unit] : unit;
+            const decimals = (unit + 'Decimals') in this.options ? this.options[unit + 'Decimals'] : 0;
             const intPart = parseInt(num.toFixed(decimals), 10) + "";
             const j = intPart.length > 3 ? intPart.length % 3 : 0;
-
             return [
                 sign,
-                j ? intPart.substr(0, j) + thousandsSep : "",
-                intPart.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + thousandsSep),
+                j ? intPart.substr(0, j) + this.options.thousandsSeparator : "",
+                intPart.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + this.options.thousandsSeparator),
                 decimals
-                    ? "." +
+                    ? this.options.decimalPoint +
                       Math.abs(num - intPart)
                           .toFixed(decimals)
                           .slice(2)
                     : "",
+                unitSymbol === null ? "" : this.options.unitSpace,
+                unitSymbol,
             ].join("");
         },
     });
