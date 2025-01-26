@@ -24,7 +24,13 @@
         color: "#FF0080", // Line color
         pointColor: "#FFFFFF", // Color of measuring point
         model: "user", // Let user pick the measurement type (alternatively: "distance" or "area")
+        showPreliminaryPath: true, // Show preliminary path at cursor position
+        // Labels
         start: "Start", // Label for the first point
+        showStartLabel: true, // Label the starting point ('distance' only)
+        showIntermediateLabels: true, // Label all intermediate points ('distance' only)
+        showPreliminaryLabel: false, // Label the preliminary distance/area at cursor position while measuring
+        showFinalLabel: true, // Label the final point with the total distance/area
         // Units and their values
         distanceUnits: { meter: 1, kilometer: 1000 }, // Units for distance, with the number of number of meters
         areaUnits: { squareMeter: 1, hectare: 1e4, squareKilometer: 1e6 }, // Units for area, with the number of square meters for each
@@ -285,8 +291,8 @@
         },
         setModel: function (model) {
             this.options.model = model;
-            this._redrawPath();
-            this._redrawLabels();
+            this.redrawPath();
+            this.redrawLabels();
             return this;
         },
         addHooks: function () {
@@ -318,7 +324,7 @@
                 this._totalDistance += newDistance;
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
-                if (this.options.model !== "area") {
+                if (this.options.model !== "area" && this.options.showIntermediateLabels) {
                     this._addLabel(latlng, this._getDistanceString(this._totalDistance), "leaflet-measure-label");
                 }
             } else {
@@ -326,7 +332,7 @@
                 this._trail.distances = [0];
                 this._addMeasurePoint(latlng);
                 this._addMarker(latlng);
-                if (this.options.model !== "area") {
+                if (this.options.model !== "area" && this.options.showStartLabel) {
                     this._addLabel(latlng, this.options.start, "leaflet-measure-label");
                 }
                 this._trail.points.push(latlng);
@@ -338,11 +344,12 @@
             const latlng = event.latlng;
             if (this._trail.points.length > 0) {
                 if (this._startMove) {
-                    this._directPath.setLatLngs(this._trail.points.concat(latlng));
+                    this._preliminaryPath.setLatLngs(this._trail.points.concat(latlng));
                 } else {
-                    this._directPath.setLatLngs([latlng]);
+                    this._preliminaryPath.setLatLngs([latlng]);
                     this._startMove = true;
                 }
+                this._resetPreliminaryLabel(latlng, true);
             }
         },
         _enableMeasure: function () {
@@ -362,7 +369,6 @@
                 // overlaying layer of type L.Canvas that swallows mouse events.
             }
             map.addLayer(this._trail.overlays);
-
             L.DomUtil.addClass(map._container, "leaflet-measure-map");
             map.contextMenu && map.contextMenu.disable();
             this._measurementStarted = true;
@@ -386,34 +392,34 @@
             if (this._trail.points.length > 0) {
                 if (this._trail.points.length > 1) {
                     if (!event || event.type === "contextmenu") {
-                        this._directPath.setLatLngs(this._trail.points);
+                        this._preliminaryPath && this._preliminaryPath.setLatLngs(this._trail.points);
                     }
-                    if (this.options.model === "area") {
-                        this._addLabel(
-                            this._lastPoint,
-                            this._getAreaString(this._trail.points),
-                            "leaflet-measure-label",
-                            true
-                        );
-                    } else {
-                        this._addLabel(
-                            this._lastPoint,
-                            this._getDistanceString(this._totalDistance),
-                            "leaflet-measure-label",
-                            true
-                        );
-                    }
-                    this._directPath && this._map.removeLayer(this._directPath);
+                    this._removePreliminaryPath();
+                    const finalMeasurement = this.options.model === "area" ? this._getAreaString(this._trail.points) : this._getDistanceString(this._totalDistance);
+                    this.options.showIntermediateLabels && this.options.model !== "area" && this._trail.labels.pop()?.remove();
+                    this.options.showFinalLabel && this._addLabel(this._lastPoint, finalMeasurement, "leaflet-measure-label", true);
                 } else {
                     this._clearOverlay.call(this);
                 }
             }
             this._disableMeasure();
         },
-        _resetDirectPath: function (latlng) {
-            if (!this._directPath) {
+        _removePreliminaryPath: function () {
+            this._removePreliminaryLabel();
+            if (!this._preliminaryPath) {
+                return;
+            }
+            this._preliminaryPath.remove();
+            this._preliminaryPath = null;
+        },
+        _resetPreliminaryPath: function (latlng) {
+            if (!this.options.showPreliminaryPath) {
+                this._removePreliminaryPath();
+                return;
+            }
+            if (!this._preliminaryPath) {
                 if (this.options.model === "area") {
-                    this._directPath = new L.Polygon([latlng], {
+                    this._preliminaryPath = new L.Polygon([latlng], {
                         weight: 2,
                         color: this.options.color,
                         dashArray: [5, 5],
@@ -421,16 +427,41 @@
                         interactive: false,
                     });
                 } else {
-                    this._directPath = new L.Polyline([latlng], {
+                    this._preliminaryPath = new L.Polyline([latlng], {
                         weight: 2,
                         color: this.options.color,
                         dashArray: [5, 5],
                         interactive: false,
                     });
                 }
-                this._trail.overlays.addLayer(this._directPath);
+                this._trail.overlays.addLayer(this._preliminaryPath);
             } else {
-                this._directPath.addLatLng(latlng);
+                this._preliminaryPath.addLatLng(latlng);
+            }
+            this._resetPreliminaryLabel(latlng);
+        },
+        _removePreliminaryLabel: function () {
+            if (!this._preliminaryLabel) {
+                return;
+            }
+            const index = this._trail ? this._trail.labels.indexOf(this._preliminaryLabel) : -1;
+            index > -1 && this._trail.labels.splice(index, 1);
+            this._preliminaryLabel.remove();
+            this._preliminaryLabel = null;
+        },
+        _resetPreliminaryLabel: function (latlng, addPreliminaryPoint = false) {
+            if (!this.options.showPreliminaryLabel || !this._lastPoint) {
+                this._removePreliminaryLabel();
+                return;
+            }
+            const currentMeasurement = this.options.model === "area"
+                ? this._getAreaString(addPreliminaryPoint ? this._trail.points.concat([latlng]) : this._trail.points)
+                : this._getDistanceString(this._totalDistance + (addPreliminaryPoint ? this._getDistance(this._lastPoint, latlng) : 0));
+            if (!this._preliminaryLabel) {
+                this._preliminaryLabel = this._addLabel(latlng, currentMeasurement, "leaflet-measure-label");
+            } else {
+                this._preliminaryLabel.setContent(currentMeasurement);
+                this._preliminaryLabel.setLatLng(latlng);
             }
         },
         _addMeasurePoint: function (latlng) {
@@ -454,7 +485,7 @@
             } else {
                 this._measurePath.addLatLng(latlng);
             }
-            this._resetDirectPath(latlng);
+            this._resetPreliminaryPath(latlng);
         },
         _addMarker: function (latLng) {
             const marker = new L.CircleMarker(latLng, {
@@ -471,67 +502,61 @@
             this._trail.overlays.addLayer(marker);
         },
         _addLabel: function (latlng, content, className, ended) {
-            const label = new L.MeasureLabel({
-                latlng: latlng,
-                content: content,
-                className: className,
-            });
+            const label = new L.MeasureLabel({ latlng, content, className });
             this._trail.labels.push(label);
             this._trail.overlays.addLayer(label);
             if (ended) {
                 const closeButton = label.enableClose();
                 L.DomEvent.on(closeButton, "click", this._clearOverlay, this);
             }
+            return label;
         },
         _removeLabels: function () {
+            // Remove all measure labels for this measure action from the map
             this._trail.labels.forEach(label => label.remove());
             this._trail.labels = [];
+            this._preliminaryLabel = null;
         },
-        _redrawLabels: function () {
+        redrawLabels: function () {
+            // Redraw all measure labels for this measure action (useful when the necessary labels change)
             this._removeLabels();
             if (!this._trail || this._trail.points.length <= 1) {
                 return;
             }
             if (this.options.model === "area") {
-                if (!this._measurementStarted) {
-                    this._addLabel(
-                        this._lastPoint,
-                        this._getAreaString(this._trail.points),
-                        "leaflet-measure-label",
-                        true
-                    );
+                if (!this._measurementStarted && this.options.showFinalLabel) {
+                    this._addLabel(this._lastPoint, this._getAreaString(this._trail.points), "leaflet-measure-label", true);
                 }
             } else {
                 let currentDistance = 0;
                 this._trail.points.forEach((latlng, i) => {
                     const distance = this._trail.distances[i];
                     currentDistance += distance;
-                    if (i == 0) {
+                    const distanceString = this._getDistanceString(currentDistance);
+                    const isFinal = i == this._trail.points.length - 1 && !this._measurementStarted;
+                    if (i == 0 && this.options.showStartLabel) {
                         this._addLabel(latlng, this.options.start, "leaflet-measure-label");
-                    } else {
-                        this._addLabel(
-                            latlng,
-                            this._getDistanceString(currentDistance),
-                            "leaflet-measure-label",
-                            i == this._trail.points.length - 1 && !this._measurementStarted
-                        );
+                    } else if (i > 0 && !isFinal && this.options.showIntermediateLabels) {
+                        this._addLabel(latlng, distanceString, "leaflet-measure-label");
+                    } else if (i > 0 && isFinal && this.options.showFinalLabel) {
+                        this._addLabel(latlng, distanceString, "leaflet-measure-label", true);
                     }
                 });
             }
         },
         _removePath: function () {
+            // Remove the path and markers for this measure action from the map
             if (this._measurePath) {
                 this._measurePath.remove();
             }
-            if (this._directPath) {
-                this._directPath.remove();
-            }
-            this._trail.markers.forEach(marker => marker.remove());
             this._measurePath = null;
-            this._directPath = null;
+            this._trail.markers.forEach(marker => marker.remove());
             this._trail.markers = [];
+            this._removeLabels();
+            this._removePreliminaryPath();
         },
-        _redrawPath: function () {
+        redrawPath: function () {
+            // Redraw the path and points for this measure action (useful when the measuring model changes)
             this._removePath();
             this._trail.points.forEach(latlng => {
                 this._addMeasurePoint(latlng);
