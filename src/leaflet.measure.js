@@ -150,7 +150,7 @@
             }
         },
         _startMeasureAction: function (model = "distance") {
-            this._measureHandler = new L.MeasureAction(this._map, L.extend(L.extend({}, this.options), { model }));
+            this._measureHandler = new L.MeasureAction(this._map, L.extend({}, this.options, { model }));
             this._measureHandler.enable();
         },
         _measureDistanceClick: function (ev) {
@@ -572,15 +572,8 @@
             return this._numberFormat(distance, unit, unitSize);
         },
         _getDistance: function (latlng1, latlng2) {
-            const earthRadius = 6378137; // radius of the earth in meters
-            const lat1 = this.toRadians(latlng1.lat);
-            const lat2 = this.toRadians(latlng2.lat);
-            const lat_dif = lat2 - lat1;
-            const lng_dif = this.toRadians(latlng2.lng - latlng1.lng);
-            const a =
-                this.square(Math.sin(lat_dif / 2)) +
-                Math.cos(lat1) * Math.cos(lat2) * this.square(Math.sin(lng_dif / 2));
-            return 2 * earthRadius * Math.asin(Math.sqrt(a));
+            // Use map CRS [Coordinate Reference System] if available, fallback to Earth otherwise
+            return this._map ? this._map.options.crs.distance(latlng1, latlng2) : L.CRS.Earth.distance(latlng1, latlng2);
         },
         _getAreaString: function (points) {
             const a = this._getArea(points);
@@ -588,7 +581,9 @@
             return this._numberFormat(a, unit, unitSize);
         },
         _getArea: function (points) {
-            const earthRadius = 6378137;
+            // Take earth's radius from map CRS if a map is available, fallback to Earth otherwise
+            // If the CRS has no R value for the radius, it is most likely L.CRS.Simple, which uses pixel values as coordinates on an infinite flat plane
+            const earthRadius = this._map ? (this._map.options.crs?.R || 0) : L.CRS.Earth.R;
             const len = points.length;
             let area = 0;
             let x1 = points[len - 1].lng;
@@ -596,11 +591,17 @@
             for (let i = 0; i < len; i++) {
                 const x2 = points[i].lng;
                 const y2 = points[i].lat;
-                area += this.toRadians(x2 - x1) * (2 + Math.sin(this.toRadians(y1)) + Math.sin(this.toRadians(y2)));
+                if (earthRadius > 0) {
+                    // Earth/spherical projection
+                    area += this.toRadians(x2 - x1) * (2 + Math.sin(this.toRadians(y1)) + Math.sin(this.toRadians(y2)));
+                } else {
+                    // Simple (flat plane) projection
+                    area += (x1 * y2) - (y1 * x2);
+                }
                 x1 = x2;
                 y1 = y2;
             }
-            return Math.abs((area * earthRadius * earthRadius) / 2.0);
+            return Math.abs((earthRadius > 0 ? (area * earthRadius * earthRadius) : area) / 2.0);
         },
         _numberFormat: function (value, unit = null, unitSize = 1) {
             const number = value / unitSize;
